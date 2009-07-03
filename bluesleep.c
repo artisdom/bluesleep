@@ -425,22 +425,6 @@ static int bluesleep_start(void)
 #else
     gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
-    /*
-    retval = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
-                IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-                "bluetooth hostwake", NULL);
-    if (retval  < 0) {
-        BT_ERR("Couldn't acquire BT_HOST_WAKE IRQ");
-        goto fail;
-    }
-
-    retval = enable_irq_wake(bsi->host_wake_irq);
-    if (retval < 0) {
-        BT_ERR("Couldn't enable BT_HOST_WAKE as wakeup interrupt");
-        free_irq(bsi->host_wake_irq, NULL);
-        goto fail;
-    }
-    */
 
     set_bit(BT_PROTO, &flags);
     return 0;
@@ -492,11 +476,6 @@ static void bluesleep_stop(void)
     atomic_inc(&open_count);
 
     spin_unlock_irqrestore(&rw_lock, irq_flags);
-    /*
-    if (disable_irq_wake(bsi->host_wake_irq))
-        BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
-    free_irq(bsi->host_wake_irq, NULL);
-    */
 }
 /**
  * Read the <code>BT_WAKE</code> GPIO pin value via the proc interface.
@@ -725,15 +704,6 @@ static int __init bluesleep_probe(struct platform_device *pdev)
         goto free_bt_host_wake;
 #endif /* CONFIG_KAV90_EVT1 */
 
-    /*
-    bsi->host_wake_irq = platform_get_irq_byname(pdev, "host_wake");
-    if (bsi->host_wake_irq < 0) {
-        BT_ERR("couldn't find host_wake irq\n");
-        ret = -ENODEV;
-        goto free_bt_ext_wake;
-    }
-    */
-
     return 0;
 
 free_bt_ext_wake:
@@ -896,11 +866,6 @@ static void __exit bluesleep_exit(void)
     gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
     if (test_bit(BT_PROTO, &flags)) {
-        /*
-        if (disable_irq_wake(bsi->host_wake_irq))
-            BT_ERR("Couldn't disable hostwake IRQ wakeup mode \n");
-        free_irq(bsi->host_wake_irq, NULL);
-        */
         del_timer(&tx_timer);
         if (test_bit(BT_ASLEEP, &flags))
             hsuart_power(1);
