@@ -270,13 +270,15 @@ static void bluesleep_outgoing_data(void)
 
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     //HELP:how to detect ext_wake status?otherwise we should always wakeup
+    int ext_wake_value;
     if (down_interruptible(&bsi->sem))
         return -ERESTARTSYS;
-    if (bsi->ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW) {
+    ext_wake_value = bsi->ext_wake_value;
+    up(&bsi->sem);
+    if (ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW) {
         BT_DBG("tx was sleeping");
         bluesleep_sleep_wakeup();
     }
-    up(&bsi->sem);
 #else
     /* if the tx side is sleeping... */
     if (gpio_get_value(bsi->ext_wake)) {
