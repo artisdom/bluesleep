@@ -165,7 +165,7 @@ static inline int bluesleep_can_sleep(void)
         return -ERESTARTSYS;
     ext_wake_value = bsi->ext_wake_value;
     up(&bsi->sem);
-    return !ext_wake_value && !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL);    
+    return !ext_wake_value && (bsi->uport != NULL);    
 #else
     return gpio_get_value(bsi->ext_wake) &&
         gpio_get_value(bsi->host_wake) &&
@@ -265,13 +265,15 @@ static void bluesleep_outgoing_data(void)
 
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     //HELP:how to detect ext_wake status?otherwise we should always wakeup
+    int ext_wake_value;
     if (down_interruptible(&bsi->sem))
         return -ERESTARTSYS;
-    if (bsi->ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW) {
+    ext_wake_value = bsi->ext_wake_value;
+    up(&bsi->sem);
+    if (ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW) {
         BT_DBG("tx was sleeping");
         bluesleep_sleep_wakeup();
     }
-    up(&bsi->sem);
 #else
     /* if the tx side is sleeping... */
     if (gpio_get_value(bsi->ext_wake)) {
@@ -423,6 +425,7 @@ static int bluesleep_start(void)
 #else
     gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
+    /*
     retval = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
                 IRQF_DISABLED | IRQF_TRIGGER_FALLING,
                 "bluetooth hostwake", NULL);
@@ -437,6 +440,7 @@ static int bluesleep_start(void)
         free_irq(bsi->host_wake_irq, NULL);
         goto fail;
     }
+    */
 
     set_bit(BT_PROTO, &flags);
     return 0;
@@ -488,9 +492,11 @@ static void bluesleep_stop(void)
     atomic_inc(&open_count);
 
     spin_unlock_irqrestore(&rw_lock, irq_flags);
+    /*
     if (disable_irq_wake(bsi->host_wake_irq))
         BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
     free_irq(bsi->host_wake_irq, NULL);
+    */
 }
 /**
  * Read the <code>BT_WAKE</code> GPIO pin value via the proc interface.
@@ -719,12 +725,14 @@ static int __init bluesleep_probe(struct platform_device *pdev)
         goto free_bt_host_wake;
 #endif /* CONFIG_KAV90_EVT1 */
 
+    /*
     bsi->host_wake_irq = platform_get_irq_byname(pdev, "host_wake");
     if (bsi->host_wake_irq < 0) {
         BT_ERR("couldn't find host_wake irq\n");
         ret = -ENODEV;
         goto free_bt_ext_wake;
     }
+    */
 
     return 0;
 
@@ -888,9 +896,11 @@ static void __exit bluesleep_exit(void)
     gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
     if (test_bit(BT_PROTO, &flags)) {
+        /*
         if (disable_irq_wake(bsi->host_wake_irq))
             BT_ERR("Couldn't disable hostwake IRQ wakeup mode \n");
         free_irq(bsi->host_wake_irq, NULL);
+        */
         del_timer(&tx_timer);
         if (test_bit(BT_ASLEEP, &flags))
             hsuart_power(1);
