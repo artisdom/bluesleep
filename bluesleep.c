@@ -165,7 +165,7 @@ static inline int bluesleep_can_sleep(void)
         return -ERESTARTSYS;
     ext_wake_value = bsi->ext_wake_value;
     up(&bsi->sem);
-    return !(bsi->ext_wake_value) && !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL);    
+    return !ext_wake_value && !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL);    
 #else
     return gpio_get_value(bsi->ext_wake) &&
         gpio_get_value(bsi->host_wake) &&
