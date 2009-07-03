@@ -165,6 +165,7 @@ static inline int bluesleep_can_sleep(void)
         return -ERESTARTSYS;
     ext_wake_value = bsi->ext_wake_value;
     up(&bsi->sem);
+    BT_DBG("ext_wake_value: %d", ext_wake_value);
     BT_DBG("host_wake: %d", gpio_get_value(bsi->host_wake));
     BT_DBG("bsi->uport != NULL: %d", bsi->uport!=NULL);
     BT_DBG("1=sleep: %d", !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL));    
@@ -269,8 +270,13 @@ static void bluesleep_outgoing_data(void)
 
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     //HELP:how to detect ext_wake status?otherwise we should always wakeup
-    if (bsi->ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW)
+    if (down_interruptible(&bsi->sem))
+        return -ERESTARTSYS;
+    if (bsi->ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW) {
+        BT_DBG("tx was sleeping");
         bluesleep_sleep_wakeup();
+    }
+    up(&bsi->sem);
 #else
     /* if the tx side is sleeping... */
     if (gpio_get_value(bsi->ext_wake)) {
@@ -508,7 +514,12 @@ static int bluepower_read_proc_btwake(char *page, char **start, off_t offset,
 {
     *eof = 1;
 #ifdef CONFIG_KAV90_EVT1 //Billy++
-    return sprintf(page, "btwake:%u\n", bsi->ext_wake_value);
+    int ext_wake_value;
+    if (down_interruptible(&bsi->sem))
+        return -ERESTARTSYS;
+    ext_wake_value = bsi-> ext_wake_value;
+    up(&bsi->sem);
+    return sprintf(page, "btwake:%u\n", ext_wake_value);
 #else
     return sprintf(page, "btwake:%u\n", gpio_get_value(bsi->ext_wake));
 #endif /* CONFIG_KAV90_EVT1 */
