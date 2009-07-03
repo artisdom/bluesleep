@@ -165,10 +165,6 @@ static inline int bluesleep_can_sleep(void)
         return -ERESTARTSYS;
     ext_wake_value = bsi->ext_wake_value;
     up(&bsi->sem);
-    BT_DBG("ext_wake_value: %d", ext_wake_value);
-    BT_DBG("host_wake: %d", gpio_get_value(bsi->host_wake));
-    BT_DBG("bsi->uport != NULL: %d", bsi->uport!=NULL);
-    BT_DBG("1=sleep: %d", !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL));    
     return !(bsi->ext_wake_value) && !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL);    
 #else
     return gpio_get_value(bsi->ext_wake) &&
@@ -231,7 +227,6 @@ static void bluesleep_sleep_work(struct work_struct *work)
 			return;
 		}
 	} else {
-		BT_DBG("cann't sleep...");
 		bluesleep_sleep_wakeup();
 	}
 }
