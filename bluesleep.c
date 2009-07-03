@@ -160,6 +160,11 @@ static inline int bluesleep_can_sleep(void)
     /* check if MSM_WAKE_BT_GPIO and BT_WAKE_MSM_GPIO are both deasserted */
 #ifdef CONFIG_KAV90_EVT1 
     //HELP:how to detect whether ext_wake is HIGH? Billy++
+    int ext_wake_value;
+    if (down_interruptible(&bsi->sem))
+        return -ERESTARTSYS;
+    ext_wake_value = bsi->ext_wake_value;
+    up(&bsi->sem);
     return !(bsi->ext_wake_value) && !gpio_get_value(bsi->host_wake) && (bsi->uport != NULL);    
 #else
     return gpio_get_value(bsi->ext_wake) &&
