@@ -19,14 +19,14 @@
 
    Date         Author           Comment
    -----------  --------------   --------------------------------
-   2006-Apr-28  Motorola     The kernel module for running the Bluetooth(R)
-                 Sleep-Mode Protocol from the Host side
+   2006-Apr-28	Motorola	 The kernel module for running the Bluetooth(R)
+				 Sleep-Mode Protocol from the Host side
    2006-Sep-08  Motorola         Added workqueue for handling sleep work.
    2007-Jan-24  Motorola         Added mbm_handle_ioi() call to ISR.
 
 */
 
-#include <linux/module.h>   /* kernel module definitions */
+#include <linux/module.h>	/* kernel module definitions */
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -62,20 +62,20 @@
  * Defines
  */
 
-#define VERSION     "1.0"
-#define PROC_DIR    "bluetooth/sleep"
+#define VERSION		"1.0"
+#define PROC_DIR	"bluetooth/sleep"
 
 struct bluesleep_info {
-    unsigned host_wake;
+	unsigned host_wake;
 #ifdef CONFIG_KAV90_EVT1
     struct mpp *ext_wake;
     struct semaphore sem;
     int ext_wake_value;
 #else
-    unsigned ext_wake;
-#endif /* CONFIG_KAV90_EVT1 */  
-    unsigned host_wake_irq;
-    struct uart_port *uport;
+	unsigned ext_wake;
+#endif /* CONFIG_KAV90_EVT1 */	
+	unsigned host_wake_irq;
+	struct uart_port *uport;
 };
 
 /* work function */
@@ -91,12 +91,12 @@ DECLARE_DELAYED_WORK(sleep_workqueue, bluesleep_sleep_work);
 #define bluesleep_tx_idle()     schedule_delayed_work(&sleep_workqueue, 0)
 
 /* 1 second timeout */
-#define TX_TIMER_INTERVAL   1
+#define TX_TIMER_INTERVAL	1
 
 /* state variable names and bit positions */
-#define BT_PROTO    0x01
-#define BT_TXDATA   0x02
-#define BT_ASLEEP   0x04
+#define BT_PROTO	0x01
+#define BT_TXDATA	0x02
+#define BT_ASLEEP	0x04
 
 /* global pointer to a single hci device. */
 static struct hci_dev *bluesleep_hdev;
@@ -111,7 +111,7 @@ static atomic_t open_count = ATOMIC_INIT(1);
  */
 
 static int bluesleep_hci_event(struct notifier_block *this,
-                unsigned long event, void *data);
+			    unsigned long event, void *data);
 
 /*
  * Global variables
@@ -131,7 +131,7 @@ static spinlock_t rw_lock;
 
 /** Notifier block for HCI events */
 struct notifier_block hci_event_nblock = {
-    .notifier_call = bluesleep_hci_event,
+	.notifier_call = bluesleep_hci_event,
 };
 
 struct proc_dir_entry *bluetooth_dir, *sleep_dir;
@@ -142,13 +142,13 @@ struct proc_dir_entry *bluetooth_dir, *sleep_dir;
 
 static void hsuart_power(int on)
 {
-    if (on) {
-        msm_hs_request_clock_on(bsi->uport);
-        msm_hs_set_mctrl_locked(bsi->uport, TIOCM_RTS);
-    } else {
-        msm_hs_set_mctrl_locked(bsi->uport, 0);
-        msm_hs_request_clock_off(bsi->uport);
-    }
+	if (on) {
+		msm_hs_request_clock_on(bsi->uport);
+		msm_hs_set_mctrl_locked(bsi->uport, TIOCM_RTS);
+	} else {
+		msm_hs_set_mctrl_locked(bsi->uport, 0);
+		msm_hs_request_clock_off(bsi->uport);
+	}
 }
 
 
@@ -157,7 +157,7 @@ static void hsuart_power(int on)
  */
 static inline int bluesleep_can_sleep(void)
 {
-    /* check if MSM_WAKE_BT_GPIO and BT_WAKE_MSM_GPIO are both deasserted */
+	/* check if MSM_WAKE_BT_GPIO and BT_WAKE_MSM_GPIO are both deasserted */
 #ifdef CONFIG_KAV90_EVT1 
     //HELP:how to detect whether ext_wake is HIGH? Billy++
     int ext_wake_value;
@@ -167,25 +167,25 @@ static inline int bluesleep_can_sleep(void)
     up(&bsi->sem);
     return !ext_wake_value && (bsi->uport != NULL);    
 #else
-    return gpio_get_value(bsi->ext_wake) &&
-        gpio_get_value(bsi->host_wake) &&
-        (bsi->uport != NULL);
+	return gpio_get_value(bsi->ext_wake) &&
+		gpio_get_value(bsi->host_wake) &&
+		(bsi->uport != NULL);
 #endif /* CONFIG_KAV90_EVT1 */
 }
 
 void bluesleep_sleep_wakeup(void)
 {
-    if (test_bit(BT_ASLEEP, &flags)) {
-        BT_DBG("waking up...");
-        /* Start the timer */
-        tx_timer.expires =
-             jiffies + (TX_TIMER_INTERVAL * HZ);
-        add_timer(&tx_timer);
+	if (test_bit(BT_ASLEEP, &flags)) {
+		BT_DBG("waking up...");
+		/* Start the timer */
+		tx_timer.expires =
+			 jiffies + (TX_TIMER_INTERVAL * HZ);
+		add_timer(&tx_timer);
 #ifdef CONFIG_KAV90_EVT1 //Billy++
         if (down_interruptible(&bsi->sem))
             return -ERESTARTSYS;
         mpp_config_digital_out(bsi->ext_wake, 
-                MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
+		        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
         if (!(bsi->ext_wake->status)) { 
             bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_HIGH; 
             BT_DBG("mpp_config HIGH success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -194,12 +194,12 @@ void bluesleep_sleep_wakeup(void)
             BT_DBG("mpp_config HIGH fail. ext_wake_value is %d\n", bsi->ext_wake_value);
         up(&bsi->sem);
 #else
-        gpio_set_value(bsi->ext_wake, 0);
-#endif /* CONFIG_KAV90_EVT1 */      
-        clear_bit(BT_ASLEEP, &flags);
-        /*Activating UART */
-        hsuart_power(1);
-    }
+		gpio_set_value(bsi->ext_wake, 0);
+#endif /* CONFIG_KAV90_EVT1 */		
+		clear_bit(BT_ASLEEP, &flags);
+		/*Activating UART */
+		hsuart_power(1);
+	}
 }
 
 /**
@@ -238,16 +238,16 @@ static void bluesleep_sleep_work(struct work_struct *work)
  */
 static void bluesleep_hostwake_task(unsigned long data)
 {
-    BT_DBG("hostwake line change");
+	BT_DBG("hostwake line change");
 
-    spin_lock(&rw_lock);
+	spin_lock(&rw_lock);
 
-    if (gpio_get_value(bsi->host_wake))
-        bluesleep_rx_busy();
-    else
-        bluesleep_rx_idle();
+	if (gpio_get_value(bsi->host_wake))
+		bluesleep_rx_busy();
+	else
+		bluesleep_rx_idle();
 
-    spin_unlock(&rw_lock);
+	spin_unlock(&rw_lock);
 }
 
 /**
@@ -256,12 +256,12 @@ static void bluesleep_hostwake_task(unsigned long data)
  */
 static void bluesleep_outgoing_data(void)
 {
-    unsigned long irq_flags;
+	unsigned long irq_flags;
 
-    spin_lock_irqsave(&rw_lock, irq_flags);
+	spin_lock_irqsave(&rw_lock, irq_flags);
 
-    /* log data passing by */
-    set_bit(BT_TXDATA, &flags);
+	/* log data passing by */
+	set_bit(BT_TXDATA, &flags);
 
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     //HELP:how to detect ext_wake status?otherwise we should always wakeup
@@ -272,17 +272,17 @@ static void bluesleep_outgoing_data(void)
     up(&bsi->sem);
     if (ext_wake_value == MPP_DLOGIC_OUT_CTRL_LOW) {
         BT_DBG("tx was sleeping");
-        bluesleep_sleep_wakeup();
+    bluesleep_sleep_wakeup();
     }
 #else
-    /* if the tx side is sleeping... */
-    if (gpio_get_value(bsi->ext_wake)) {
+	/* if the tx side is sleeping... */
+	if (gpio_get_value(bsi->ext_wake)) {
 
-        BT_DBG("tx was sleeping");
-        bluesleep_sleep_wakeup();
-    }
+		BT_DBG("tx was sleeping");
+		bluesleep_sleep_wakeup();
+	}
 #endif /* CONFIG_KAV90_EVT1 */
-    spin_unlock_irqrestore(&rw_lock, irq_flags);
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
 }
 
 /**
@@ -293,34 +293,34 @@ static void bluesleep_outgoing_data(void)
  * @return <code>NOTIFY_DONE</code>.
  */
 static int bluesleep_hci_event(struct notifier_block *this,
-                unsigned long event, void *data)
+				unsigned long event, void *data)
 {
-    struct hci_dev *hdev = (struct hci_dev *) data;
-    struct hci_uart *hu;
-    struct uart_state *state;
+	struct hci_dev *hdev = (struct hci_dev *) data;
+	struct hci_uart *hu;
+	struct uart_state *state;
 
-    if (!hdev)
-        return NOTIFY_DONE;
+	if (!hdev)
+		return NOTIFY_DONE;
 
-    switch (event) {
-    case HCI_DEV_REG:
-        if (!bluesleep_hdev) {
-            bluesleep_hdev = hdev;
-            hu  = (struct hci_uart *) hdev->driver_data;
-            state = (struct uart_state *) hu->tty->driver_data;
-            bsi->uport = state->port;
-        }
-        break;
-    case HCI_DEV_UNREG:
-        bluesleep_hdev = NULL;
-        bsi->uport = NULL;
-        break;
-    case HCI_DEV_WRITE:
-        bluesleep_outgoing_data();
-        break;
-    }
+	switch (event) {
+	case HCI_DEV_REG:
+		if (!bluesleep_hdev) {
+			bluesleep_hdev = hdev;
+			hu  = (struct hci_uart *) hdev->driver_data;
+			state = (struct uart_state *) hu->tty->driver_data;
+			bsi->uport = state->port;
+		}
+		break;
+	case HCI_DEV_UNREG:
+		bluesleep_hdev = NULL;
+		bsi->uport = NULL;
+		break;
+	case HCI_DEV_WRITE:
+		bluesleep_outgoing_data();
+		break;
+	}
 
-    return NOTIFY_DONE;
+	return NOTIFY_DONE;
 }
 
 /**
@@ -329,20 +329,20 @@ static int bluesleep_hci_event(struct notifier_block *this,
  */
 static void bluesleep_tx_timer_expire(unsigned long data)
 {
-    unsigned long irq_flags;
+	unsigned long irq_flags;
 
-    spin_lock_irqsave(&rw_lock, irq_flags);
+	spin_lock_irqsave(&rw_lock, irq_flags);
 
-    BT_DBG("Tx timer expired");
+	BT_DBG("Tx timer expired");
 
-    /* were we silent during the last timeout? */
-    if (!test_bit(BT_TXDATA, &flags)) {
-        BT_DBG("Tx has been idle");
+	/* were we silent during the last timeout? */
+	if (!test_bit(BT_TXDATA, &flags)) {
+		BT_DBG("Tx has been idle");
 #ifdef CONFIG_KAV90_EVT1
         if (down_interruptible(&bsi->sem))
             return -ERESTARTSYS;
         mpp_config_digital_out(bsi->ext_wake, 
-                MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_LOW));
+		        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_LOW));
         if (!(bsi->ext_wake->status)) { 
             bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_LOW; 
             BT_DBG("mpp_config LOW success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -351,19 +351,19 @@ static void bluesleep_tx_timer_expire(unsigned long data)
             BT_DBG("mpp_config LOW fail. ext_wake_value is %d\n", bsi->ext_wake_value);
         up(&bsi->sem);
 #else
-        gpio_set_value(bsi->ext_wake, 1);
+		gpio_set_value(bsi->ext_wake, 1);
 #endif /* CONFIG_KAV90_EVT1 */
-        bluesleep_tx_idle();
-    } else {
-        BT_DBG("Tx data during last period");
-        tx_timer.expires = jiffies + (TX_TIMER_INTERVAL*HZ);
-        add_timer(&tx_timer);
-    }
+		bluesleep_tx_idle();
+	} else {
+		BT_DBG("Tx data during last period");
+		tx_timer.expires = jiffies + (TX_TIMER_INTERVAL*HZ);
+		add_timer(&tx_timer);
+	}
 
-    /* clear the incoming data flag */
-    clear_bit(BT_TXDATA, &flags);
+	/* clear the incoming data flag */
+	clear_bit(BT_TXDATA, &flags);
 
-    spin_unlock_irqrestore(&rw_lock, irq_flags);
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
 }
 
 /**
@@ -374,11 +374,11 @@ static void bluesleep_tx_timer_expire(unsigned long data)
  */
 static irqreturn_t bluesleep_hostwake_isr(int irq, void *dev_id)
 {
-    gpio_clear_detect_status(bsi->host_wake_irq);
+	gpio_clear_detect_status(bsi->host_wake_irq);
 
-    /* schedule a tasklet to handle the change in the host wake line */
-    tasklet_schedule(&hostwake_task);
-    return IRQ_HANDLED;
+	/* schedule a tasklet to handle the change in the host wake line */
+	tasklet_schedule(&hostwake_task);
+	return IRQ_HANDLED;
 }
 
 /**
@@ -388,33 +388,33 @@ static irqreturn_t bluesleep_hostwake_isr(int irq, void *dev_id)
  */
 static int bluesleep_start(void)
 {
-    int retval;
-    unsigned long irq_flags;
+	int retval;
+	unsigned long irq_flags;
 
-    spin_lock_irqsave(&rw_lock, irq_flags);
+	spin_lock_irqsave(&rw_lock, irq_flags);
 
-    if (test_bit(BT_PROTO, &flags)) {
-        spin_unlock_irqrestore(&rw_lock, irq_flags);
-        return 0;
-    }
+	if (test_bit(BT_PROTO, &flags)) {
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+		return 0;
+	}
 
-    spin_unlock_irqrestore(&rw_lock, irq_flags);
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
 
-    if (!atomic_dec_and_test(&open_count)) {
-        atomic_inc(&open_count);
-        return -EBUSY;
-    }
+	if (!atomic_dec_and_test(&open_count)) {
+		atomic_inc(&open_count);
+		return -EBUSY;
+	}
 
-    /* start the timer */
-    tx_timer.expires = jiffies + (TX_TIMER_INTERVAL*HZ);
-    add_timer(&tx_timer);
+	/* start the timer */
+	tx_timer.expires = jiffies + (TX_TIMER_INTERVAL*HZ);
+	add_timer(&tx_timer);
 
-    /* assert BT_WAKE */
+	/* assert BT_WAKE */
 #ifdef CONFIG_KAV90_EVT1
     if (down_interruptible(&bsi->sem))
         return -ERESTARTSYS;
     mpp_config_digital_out(bsi->ext_wake,
-            MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
+	        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
     if (!(bsi->ext_wake->status)) { 
         bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_HIGH; 
         BT_DBG("mpp_config HIGH success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -423,16 +423,16 @@ static int bluesleep_start(void)
         BT_DBG("mpp_config HIGH fail. ext_wake_value is %d\n", bsi->ext_wake_value);
     up(&bsi->sem);
 #else
-    gpio_set_value(bsi->ext_wake, 0);
+	gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
 
-    set_bit(BT_PROTO, &flags);
-    return 0;
+	set_bit(BT_PROTO, &flags);
+	return 0;
 fail:
-    del_timer(&tx_timer);
-    atomic_inc(&open_count);
+	del_timer(&tx_timer);
+	atomic_inc(&open_count);
 
-    return retval;
+	return retval;
 }
 
 /**
@@ -440,21 +440,21 @@ fail:
  */
 static void bluesleep_stop(void)
 {
-    unsigned long irq_flags;
+	unsigned long irq_flags;
 
-    spin_lock_irqsave(&rw_lock, irq_flags);
+	spin_lock_irqsave(&rw_lock, irq_flags);
 
-    if (!test_bit(BT_PROTO, &flags)) {
-        spin_unlock_irqrestore(&rw_lock, irq_flags);
-        return;
-    }
+	if (!test_bit(BT_PROTO, &flags)) {
+		spin_unlock_irqrestore(&rw_lock, irq_flags);
+		return;
+	}
 
-    /* assert BT_WAKE */
+	/* assert BT_WAKE */
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     if (down_interruptible(&bsi->sem))
         return -ERESTARTSYS;
     mpp_config_digital_out(bsi->ext_wake,
-            MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
+	        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
     if (!(bsi->ext_wake->status)) { 
         bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_HIGH; 
         BT_DBG("mpp_config HIGH success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -463,19 +463,19 @@ static void bluesleep_stop(void)
         BT_DBG("mpp_config HIGH fail. ext_wake_value is %d\n", bsi->ext_wake_value);
     up(&bsi->sem);
 #else
-    gpio_set_value(bsi->ext_wake, 0);
+	gpio_set_value(bsi->ext_wake, 0);
 #endif /*CONFIG_KAV90_EVT1*/
-    del_timer(&tx_timer);
-    clear_bit(BT_PROTO, &flags);
+	del_timer(&tx_timer);
+	clear_bit(BT_PROTO, &flags);
 
-    if (test_bit(BT_ASLEEP, &flags)) {
-        clear_bit(BT_ASLEEP, &flags);
-        hsuart_power(1);
-    }
+	if (test_bit(BT_ASLEEP, &flags)) {
+		clear_bit(BT_ASLEEP, &flags);
+		hsuart_power(1);
+	}
 
-    atomic_inc(&open_count);
+	atomic_inc(&open_count);
 
-    spin_unlock_irqrestore(&rw_lock, irq_flags);
+	spin_unlock_irqrestore(&rw_lock, irq_flags);
 }
 /**
  * Read the <code>BT_WAKE</code> GPIO pin value via the proc interface.
@@ -490,9 +490,9 @@ static void bluesleep_stop(void)
  * @return The number of bytes written.
  */
 static int bluepower_read_proc_btwake(char *page, char **start, off_t offset,
-                    int count, int *eof, void *data)
+					int count, int *eof, void *data)
 {
-    *eof = 1;
+	*eof = 1;
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     int ext_wake_value;
     if (down_interruptible(&bsi->sem))
@@ -501,7 +501,7 @@ static int bluepower_read_proc_btwake(char *page, char **start, off_t offset,
     up(&bsi->sem);
     return sprintf(page, "btwake:%u\n", ext_wake_value);
 #else
-    return sprintf(page, "btwake:%u\n", gpio_get_value(bsi->ext_wake));
+	return sprintf(page, "btwake:%u\n", gpio_get_value(bsi->ext_wake));
 #endif /* CONFIG_KAV90_EVT1 */
 }
 
@@ -515,28 +515,28 @@ static int bluepower_read_proc_btwake(char *page, char **start, off_t offset,
  * <code>errno</code> is set appropriately.
  */
 static int bluepower_write_proc_btwake(struct file *file, const char *buffer,
-                    unsigned long count, void *data)
+					unsigned long count, void *data)
 {
-    char *buf;
+	char *buf;
 
-    if (count < 1)
-        return -EINVAL;
+	if (count < 1)
+		return -EINVAL;
 
-    buf = kmalloc(count, GFP_KERNEL);
-    if (!buf)
-        return -ENOMEM;
+	buf = kmalloc(count, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
-    if (copy_from_user(buf, buffer, count)) {
-        kfree(buf);
-        return -EFAULT;
-    }
+	if (copy_from_user(buf, buffer, count)) {
+		kfree(buf);
+		return -EFAULT;
+	}
 
-    if (buf[0] == '0') {
+	if (buf[0] == '0') {
 #ifdef CONFIG_KAV90_EVT1 //Billy++
         if (down_interruptible(&bsi->sem))
             return -ERESTARTSYS;
         mpp_config_digital_out(bsi->ext_wake,
-                MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
+		        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
         if (!(bsi->ext_wake->status)) { 
             bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_HIGH; 
             BT_DBG("mpp_config HIGH success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -545,14 +545,14 @@ static int bluepower_write_proc_btwake(struct file *file, const char *buffer,
             BT_DBG("mpp_config HIGH fail. ext_wake_value is %d\n", bsi->ext_wake_value);
         up(&bsi->sem);
 #else
-        gpio_set_value(bsi->ext_wake, 0);
+		gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
-    } else if (buf[0] == '1') {
+	} else if (buf[0] == '1') {
 #ifdef CONFIG_KAV90_EVT1 //Billy++
         if (down_interruptible(&bsi->sem))
             return -ERESTARTSYS;
         mpp_config_digital_out(bsi->ext_wake,
-                MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_LOW));
+		        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_LOW));
         if (!(bsi->ext_wake->status)) { 
             bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_LOW; 
             BT_DBG("mpp_config LOW success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -561,15 +561,15 @@ static int bluepower_write_proc_btwake(struct file *file, const char *buffer,
             BT_DBG("mpp_config LOW fail. ext_wake_value is %d\n", bsi->ext_wake_value);
         up(&bsi->sem);
 #else
-        gpio_set_value(bsi->ext_wake, 1);
+		gpio_set_value(bsi->ext_wake, 1);
 #endif /* CONFIG_KAV90_EVT1 */
-    } else {
-        kfree(buf);
-        return -EINVAL;
-    }
+	} else {
+		kfree(buf);
+		return -EINVAL;
+	}
 
-    kfree(buf);
-    return count;
+	kfree(buf);
+	return count;
 }
 
 /**
@@ -585,10 +585,10 @@ static int bluepower_write_proc_btwake(struct file *file, const char *buffer,
  * @return The number of bytes written.
  */
 static int bluepower_read_proc_hostwake(char *page, char **start, off_t offset,
-                    int count, int *eof, void *data)
+					int count, int *eof, void *data)
 {
-    *eof = 1;
-    return sprintf(page, "hostwake: %u \n", gpio_get_value(bsi->host_wake));
+	*eof = 1;
+	return sprintf(page, "hostwake: %u \n", gpio_get_value(bsi->host_wake));
 }
 
 
@@ -605,13 +605,13 @@ static int bluepower_read_proc_hostwake(char *page, char **start, off_t offset,
  * @return The number of bytes written.
  */
 static int bluesleep_read_proc_asleep(char *page, char **start, off_t offset,
-                    int count, int *eof, void *data)
+					int count, int *eof, void *data)
 {
-    unsigned int asleep;
+	unsigned int asleep;
 
-    asleep = test_bit(BT_ASLEEP, &flags) ? 1 : 0;
-    *eof = 1;
-    return sprintf(page, "asleep: %u\n", asleep);
+	asleep = test_bit(BT_ASLEEP, &flags) ? 1 : 0;
+	*eof = 1;
+	return sprintf(page, "asleep: %u\n", asleep);
 }
 
 /**
@@ -627,13 +627,13 @@ static int bluesleep_read_proc_asleep(char *page, char **start, off_t offset,
  * @return The number of bytes written.
  */
 static int bluesleep_read_proc_proto(char *page, char **start, off_t offset,
-                    int count, int *eof, void *data)
+					int count, int *eof, void *data)
 {
-    unsigned int proto;
+	unsigned int proto;
 
-    proto = test_bit(BT_PROTO, &flags) ? 1 : 0;
-    *eof = 1;
-    return sprintf(page, "proto: %u\n", proto);
+	proto = test_bit(BT_PROTO, &flags) ? 1 : 0;
+	*eof = 1;
+	return sprintf(page, "proto: %u\n", proto);
 }
 
 /**
@@ -646,94 +646,94 @@ static int bluesleep_read_proc_proto(char *page, char **start, off_t offset,
  * <code>errno</code> is set appropriately.
  */
 static int bluesleep_write_proc_proto(struct file *file, const char *buffer,
-                    unsigned long count, void *data)
+					unsigned long count, void *data)
 {
-    char proto;
+	char proto;
 
-    if (count < 1)
-        return -EINVAL;
+	if (count < 1)
+		return -EINVAL;
 
-    if (copy_from_user(&proto, buffer, 1))
-        return -EFAULT;
+	if (copy_from_user(&proto, buffer, 1))
+		return -EFAULT;
 
-    if (proto == '0')
-        bluesleep_stop();
-    else
-        bluesleep_start();
+	if (proto == '0')
+		bluesleep_stop();
+	else
+		bluesleep_start();
 
-    /* claim that we wrote everything */
-    return count;
+	/* claim that we wrote everything */
+	return count;
 }
 
 static int __init bluesleep_probe(struct platform_device *pdev)
 {
-    int ret;
-    struct resource *res;
+	int ret;
+	struct resource *res;
 
-    bsi = kzalloc(sizeof(struct bluesleep_info), GFP_KERNEL);
-    if (!bsi)
-        return -ENOMEM;
+	bsi = kzalloc(sizeof(struct bluesleep_info), GFP_KERNEL);
+	if (!bsi)
+		return -ENOMEM;
 
-    res = platform_get_resource_byname(pdev, IORESOURCE_IO,
-                "gpio_host_wake");
-    if (!res) {
-        BT_ERR("couldn't find host_wake gpio\n");
-        ret = -ENODEV;
-        goto free_bsi;
-    }
-    bsi->host_wake = res->start;
+	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
+				"gpio_host_wake");
+	if (!res) {
+		BT_ERR("couldn't find host_wake gpio\n");
+		ret = -ENODEV;
+		goto free_bsi;
+	}
+	bsi->host_wake = res->start;
 
-    ret = gpio_request(bsi->host_wake, "bt_host_wake");
-    if (ret)
-        goto free_bsi;
+	ret = gpio_request(bsi->host_wake, "bt_host_wake");
+	if (ret)
+		goto free_bsi;
 
 #ifdef CONFIG_KAV90_EVT1
     bsi->ext_wake = mpp_get(NULL,"mpp16");
 #else
-    res = platform_get_resource_byname(pdev, IORESOURCE_IO,
-                "gpio_ext_wake");
-    if (!res) {
-        BT_ERR("couldn't find ext_wake gpio\n");
-        ret = -ENODEV;
-        goto free_bt_host_wake;
-    }
-    bsi->ext_wake = res->start;
+	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
+				"gpio_ext_wake");
+	if (!res) {
+		BT_ERR("couldn't find ext_wake gpio\n");
+		ret = -ENODEV;
+		goto free_bt_host_wake;
+	}
+	bsi->ext_wake = res->start;
 
-    ret = gpio_request(bsi->ext_wake, "bt_ext_wake");
-    if (ret)
-        goto free_bt_host_wake;
+	ret = gpio_request(bsi->ext_wake, "bt_ext_wake");
+	if (ret)
+		goto free_bt_host_wake;
 #endif /* CONFIG_KAV90_EVT1 */
 
-    return 0;
+	return 0;
 
 free_bt_ext_wake:
 #ifndef CONFIG_KAV90_EVT1 //Billy++
-    gpio_free(bsi->ext_wake);
+	gpio_free(bsi->ext_wake);
 #endif /* CONFIG_KAV90_EVT1 */
 free_bt_host_wake:
-    gpio_free(bsi->host_wake);
+	gpio_free(bsi->host_wake);
 free_bsi:
-    kfree(bsi);
-    return ret;
+	kfree(bsi);
+	return ret;
 }
 
 static int bluesleep_remove(struct platform_device *pdev)
 {
-    gpio_free(bsi->host_wake);
+	gpio_free(bsi->host_wake);
 #ifndef CONFIG_KAV90_EVT1 //Billy++
-    gpio_free(bsi->ext_wake);
+	gpio_free(bsi->ext_wake);
 #endif /* CONFIG_KAV90_EVT1 */
-    kfree(bsi);
-    return 0;
+	kfree(bsi);
+	return 0;
 }
 
 static struct platform_driver bluesleep_driver = {
-    .probe = bluesleep_probe,
-    .remove = bluesleep_remove,
-    .driver = {
-        .name = "bluesleep",
-        .owner = THIS_MODULE,
-    },
+	.probe = bluesleep_probe,
+	.remove = bluesleep_remove,
+	.driver = {
+		.name = "bluesleep",
+		.owner = THIS_MODULE,
+	},
 };
 /**
  * Initializes the module.
@@ -742,80 +742,80 @@ static struct platform_driver bluesleep_driver = {
  */
 static int __init bluesleep_init(void)
 {
-    int retval;
-    struct proc_dir_entry *ent;
+	int retval;
+	struct proc_dir_entry *ent;
 
-    BT_INFO("MSM Sleep Mode Driver Ver %s", VERSION);
+	BT_INFO("MSM Sleep Mode Driver Ver %s", VERSION);
 
-    retval = platform_driver_register(&bluesleep_driver);
-    if (retval)
-        return retval;
+	retval = platform_driver_register(&bluesleep_driver);
+	if (retval)
+		return retval;
 
-    bluesleep_hdev = NULL;
+	bluesleep_hdev = NULL;
 
-    bluetooth_dir = proc_mkdir("bluetooth", NULL);
-    if (bluetooth_dir == NULL) {
-        BT_ERR("Unable to create /proc/bluetooth directory");
-        return -ENOMEM;
-    }
+	bluetooth_dir = proc_mkdir("bluetooth", NULL);
+	if (bluetooth_dir == NULL) {
+		BT_ERR("Unable to create /proc/bluetooth directory");
+		return -ENOMEM;
+	}
 
-    sleep_dir = proc_mkdir("sleep", bluetooth_dir);
-    if (sleep_dir == NULL) {
-        BT_ERR("Unable to create /proc/%s directory", PROC_DIR);
-        return -ENOMEM;
-    }
+	sleep_dir = proc_mkdir("sleep", bluetooth_dir);
+	if (sleep_dir == NULL) {
+		BT_ERR("Unable to create /proc/%s directory", PROC_DIR);
+		return -ENOMEM;
+	}
 
-    /* Creating read/write "btwake" entry */
-    ent = create_proc_entry("btwake", 0, sleep_dir);
-    if (ent == NULL) {
-        BT_ERR("Unable to create /proc/%s/btwake entry", PROC_DIR);
-        retval = -ENOMEM;
-        goto fail;
-    }
-    ent->read_proc = bluepower_read_proc_btwake;
-    ent->write_proc = bluepower_write_proc_btwake;
+	/* Creating read/write "btwake" entry */
+	ent = create_proc_entry("btwake", 0, sleep_dir);
+	if (ent == NULL) {
+		BT_ERR("Unable to create /proc/%s/btwake entry", PROC_DIR);
+		retval = -ENOMEM;
+		goto fail;
+	}
+	ent->read_proc = bluepower_read_proc_btwake;
+	ent->write_proc = bluepower_write_proc_btwake;
 
-    /* read only proc entries */
-    if (create_proc_read_entry("hostwake", 0, sleep_dir,
-                bluepower_read_proc_hostwake, NULL) == NULL) {
-        BT_ERR("Unable to create /proc/%s/hostwake entry", PROC_DIR);
-        retval = -ENOMEM;
-        goto fail;
-    }
+	/* read only proc entries */
+	if (create_proc_read_entry("hostwake", 0, sleep_dir,
+				bluepower_read_proc_hostwake, NULL) == NULL) {
+		BT_ERR("Unable to create /proc/%s/hostwake entry", PROC_DIR);
+		retval = -ENOMEM;
+		goto fail;
+	}
 
-    /* read/write proc entries */
-    ent = create_proc_entry("proto", 0, sleep_dir);
-    if (ent == NULL) {
-        BT_ERR("Unable to create /proc/%s/proto entry", PROC_DIR);
-        retval = -ENOMEM;
-        goto fail;
-    }
-    ent->read_proc = bluesleep_read_proc_proto;
-    ent->write_proc = bluesleep_write_proc_proto;
+	/* read/write proc entries */
+	ent = create_proc_entry("proto", 0, sleep_dir);
+	if (ent == NULL) {
+		BT_ERR("Unable to create /proc/%s/proto entry", PROC_DIR);
+		retval = -ENOMEM;
+		goto fail;
+	}
+	ent->read_proc = bluesleep_read_proc_proto;
+	ent->write_proc = bluesleep_write_proc_proto;
 
-    /* read only proc entries */
-    if (create_proc_read_entry("asleep", 0,
-            sleep_dir, bluesleep_read_proc_asleep, NULL) == NULL) {
-        BT_ERR("Unable to create /proc/%s/asleep entry", PROC_DIR);
-        retval = -ENOMEM;
-        goto fail;
-    }
+	/* read only proc entries */
+	if (create_proc_read_entry("asleep", 0,
+			sleep_dir, bluesleep_read_proc_asleep, NULL) == NULL) {
+		BT_ERR("Unable to create /proc/%s/asleep entry", PROC_DIR);
+		retval = -ENOMEM;
+		goto fail;
+	}
 
-    flags = 0; /* clear all status bits */
+	flags = 0; /* clear all status bits */
 
-    /* Initialize spinlock. */
-    spin_lock_init(&rw_lock);
+	/* Initialize spinlock. */
+	spin_lock_init(&rw_lock);
     init_MUTEX(&bsi->sem);
 
-    /* Initialize timer */
-    init_timer(&tx_timer);
-    tx_timer.function = bluesleep_tx_timer_expire;
-    tx_timer.data = 0;
+	/* Initialize timer */
+	init_timer(&tx_timer);
+	tx_timer.function = bluesleep_tx_timer_expire;
+	tx_timer.data = 0;
 
-    /* initialize host wake tasklet */
-    tasklet_init(&hostwake_task, bluesleep_hostwake_task, 0);
+	/* initialize host wake tasklet */
+	tasklet_init(&hostwake_task, bluesleep_hostwake_task, 0);
 
-    /* assert bt wake */
+	/* assert bt wake */
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     if (down_interruptible(&bsi->sem))
         return -ERESTARTSYS;
@@ -828,20 +828,20 @@ static int __init bluesleep_init(void)
         BT_DBG("mpp_config HIGH fail. ext_wake_value is %d\n", bsi->ext_wake_value);
     up(&bsi->sem);
 #else
-    gpio_set_value(bsi->ext_wake, 0);
+	gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
-    hci_register_notifier(&hci_event_nblock);
+	hci_register_notifier(&hci_event_nblock);
 
-    return 0;
+	return 0;
 
 fail:
-    remove_proc_entry("asleep", sleep_dir);
-    remove_proc_entry("proto", sleep_dir);
-    remove_proc_entry("hostwake", sleep_dir);
-    remove_proc_entry("btwake", sleep_dir);
-    remove_proc_entry("sleep", bluetooth_dir);
-    remove_proc_entry("bluetooth", 0);
-    return retval;
+	remove_proc_entry("asleep", sleep_dir);
+	remove_proc_entry("proto", sleep_dir);
+	remove_proc_entry("hostwake", sleep_dir);
+	remove_proc_entry("btwake", sleep_dir);
+	remove_proc_entry("sleep", bluetooth_dir);
+	remove_proc_entry("bluetooth", 0);
+	return retval;
 }
 
 /**
@@ -849,12 +849,12 @@ fail:
  */
 static void __exit bluesleep_exit(void)
 {
-    /* assert bt wake */
+	/* assert bt wake */
 #ifdef CONFIG_KAV90_EVT1 //Billy++
     if (down_interruptible(&bsi->sem))
         return -ERESTARTSYS;
     mpp_config_digital_out(bsi->ext_wake,
-            MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
+	        MPP_CFG(MPP_DLOGIC_LVL_MSMP, MPP_DLOGIC_OUT_CTRL_HIGH));
     if (!(bsi->ext_wake->status)) { 
         bsi->ext_wake_value = MPP_DLOGIC_OUT_CTRL_HIGH; 
         BT_DBG("mpp_config HIGH success. ext_wake_value is %d\n", bsi->ext_wake_value);
@@ -863,23 +863,23 @@ static void __exit bluesleep_exit(void)
         BT_DBG("mpp_config HIGH fail. ext_wake_value is %d\n", bsi->ext_wake_value);
     up(&bsi->sem);
 #else
-    gpio_set_value(bsi->ext_wake, 0);
+	gpio_set_value(bsi->ext_wake, 0);
 #endif /* CONFIG_KAV90_EVT1 */
-    if (test_bit(BT_PROTO, &flags)) {
-        del_timer(&tx_timer);
-        if (test_bit(BT_ASLEEP, &flags))
-            hsuart_power(1);
-    }
+	if (test_bit(BT_PROTO, &flags)) {
+		del_timer(&tx_timer);
+		if (test_bit(BT_ASLEEP, &flags))
+			hsuart_power(1);
+	}
 
-    hci_unregister_notifier(&hci_event_nblock);
-    platform_driver_unregister(&bluesleep_driver);
+	hci_unregister_notifier(&hci_event_nblock);
+	platform_driver_unregister(&bluesleep_driver);
 
-    remove_proc_entry("asleep", sleep_dir);
-    remove_proc_entry("proto", sleep_dir);
-    remove_proc_entry("hostwake", sleep_dir);
-    remove_proc_entry("btwake", sleep_dir);
-    remove_proc_entry("sleep", bluetooth_dir);
-    remove_proc_entry("bluetooth", 0);
+	remove_proc_entry("asleep", sleep_dir);
+	remove_proc_entry("proto", sleep_dir);
+	remove_proc_entry("hostwake", sleep_dir);
+	remove_proc_entry("btwake", sleep_dir);
+	remove_proc_entry("sleep", bluetooth_dir);
+	remove_proc_entry("bluetooth", 0);
 }
 
 module_init(bluesleep_init);
